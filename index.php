@@ -16,6 +16,11 @@ $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
 $db->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 
+
+ // プルダウンメニューの値をDBから取得の挙動
+    $sql1 = $db->query('SELECT * FROM m_product');
+    $sql1->execute();
+
 // formのmethodがPOSTであり、データを挿入する場合の挙動
 if($_SERVER['REQUEST_METHOD'] === "POST") {
     // form内にあるPOSTを受け取ったときの値
@@ -28,58 +33,63 @@ if($_SERVER['REQUEST_METHOD'] === "POST") {
     $order_email = $_POST['order_email'];
     $new_user_code = $_POST['new_user_code'];
     
-    // 新規ユーザーが購入したときの挙動
-    // 新規ユーザー情報の中に値が入っているときの挙動
-    if(!empty($_POST['new_user_code'])){
-        $query = $db->prepare('SELECT * FROM m_user WHERE user_code = :user_code LIMIT 1');
 
-        $query->execute(array(':user_code' => $new_user_codeuser_code));
+    
+    $stmt = $db->prepare('SELECT * FROM m_user WHERE user_code = :user_code');
+    $stmt->bindValue(':user_code', $new_user_code);
+    $stmt->execute();
+    $result = $stmt->fetch();
 
-        $result = $query->fetch();
-
-        if($result > 0){
-            $err_msg['user_code'] = '既に'. $new_user_code . 'は利用されているため、再度入力お願いします。';
-        } else {
-            $stmt1 = $db->prepare('INSERT INTO 
+    if($result > 0) {
+        // エラーコードを表示
+        echo "既にそのユーザーコードは使用されています。再入力お願いします。";
+        
+    } else {
+        $stmt1 = $db->prepare('INSERT INTO 
             t_order(user_code, order_date,product_code, product_qty, created_at) 
             VALUES (:user_code, now(), :product_code, :product_qty, now())');
 
-            $stmt2 = $db->prepare('INSERT INTO  
+        $stmt2 = $db->prepare('INSERT INTO  
             m_user(user_code, user_name1, user_name2, user_tel, user_email, created_at)  
             VALUES (:user_code, :user_name1, :user_name2, :user_tel, :user_email, now())');
 
-            $stmt1->bindValue(':user_code', $new_user_code);
-            $stmt1->bindValue(':product_code', $product);
-            $stmt1->bindValue(':product_qty', $product_num);
+        $stmt1->bindValue(':user_code', $new_user_code);
+        $stmt1->bindValue(':product_code', $product);
+        $stmt1->bindValue(':product_qty', $product_num);
 
-            $stmt2->bindValue(':user_code', $new_user_code);
-            $stmt2->bindValue(':user_name1', $order_family_name);
-            $stmt2->bindValue(':user_name2', $order_personal_name);
-            $stmt2->bindValue(':user_tel', $order_tel);
-            $stmt2->bindValue(':user_email', $order_email);
+        $stmt2->bindValue(':user_code', $new_user_code);
+        $stmt2->bindValue(':user_name1', $order_family_name);
+        $stmt2->bindValue(':user_name2', $order_personal_name);
+        $stmt2->bindValue(':user_tel', $order_tel);
+        $stmt2->bindValue(':user_email', $order_email);
             // 実行
-            $stmt1->execute();
-            $stmt2->execute();
-        }
+        $stmt1->execute();
+        $stmt2->execute();
 
-        //  ユーザーコードに値があり、新規ユーザーコードが空であるとき
-        // 既存のユーザーが購入したときの挙動
-     if(!empty($user_code) && empty($new_user_code)) {   
-        $stmt1 = $db->prepare('INSERT INTO 
-        t_order(user_code, order_date,product_code, product_qty, created_at) 
-        VALUES (:user_code, now(), :product_code, :product_qty, now())');
-
-          // $stmt1のbindValueで以下のデータをDBに挿入するために使用
-          $stmt1->bindValue(':user_code', $user_code);
-          $stmt1->bindValue(':product_code', $product);
-          $stmt1->bindValue(':product_qty', $product_num);
-          //$stmt2のbindValueで以下のデータをDBに挿入するために使用
-
-          // 実行
-          $stmt1->execute();
-          $row1 = $stmt1->fetch(PDO::FETCH_ASSOC);
-        }
+              // thanks.phpへ移動する
+        header('location:  http://localhost/assignment_form/thanks.php');
     }
+
+    //  ユーザーコードに値があり、新規ユーザーコードが空であるとき
+        // 既存のユーザーが購入したときの挙動
+        if(!empty($user_code) && empty($new_user_code)) {   
+            $stmt3 = $db->prepare('INSERT INTO 
+            t_order(user_code, order_date,product_code, product_qty, created_at) 
+            VALUES (:user_code, now(), :product_code, :product_qty, now())');
+    
+              // $stmt1のbindValueで以下のデータをDBに挿入するために使用
+            $stmt3->bindValue(':user_code', $user_code);
+            $stmt3->bindValue(':product_code', $product);
+            $stmt3->bindValue(':product_qty', $product_num);
+              //$stmt2のbindValueで以下のデータをDBに挿入するために使用
+    
+              // 実行
+            $stmt3->execute();
+            //thanks.phpに画面遷移する挙動   
+            header('location: http://localhost/assignment_form/thanks.php');
+        }            
+        
+        exit;
 }
 
 ?>
@@ -96,11 +106,12 @@ if($_SERVER['REQUEST_METHOD'] === "POST") {
             <div>
                 <label style="width : 145px; display: inline-block; text-align: right;">注文１：</label>
                 <select name="product">
-                    <option value="">選択してね</option>
-                    <option value="1">1万</option>
-                    <option value="5">5万</option>
-                    <option value="10">10万</option>
-                    <option value="50">50万</option>
+                    <!-- プルダウンの処理 -->
+                    <?php while($row = $sql1->fetch(PDO::FETCH_ASSOC)):?>
+                    <option value="<?php echo $row['product_code']; ?>">
+                        <?php echo htmlspecialchars($row['product_name'], ENT_QUOTES); ?>
+                    </option>
+                    <?php  endwhile;?>
                 </select>
 		 <div>
 			  <label style="width : 145px; display: inline-block; text-align: right;">数量：</label>
