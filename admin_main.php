@@ -17,7 +17,7 @@ $db->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 
 
 // 上が在庫総額、下が売上総額を表示するためのクエリ
-$sql = $db->prepare('SELECT SUM(product_price * stock_qty) AS stock_price 
+$sql = $db->prepare('SELECT SUM(product_price * stock_qty) AS stock_price_all 
     FROM m_product AS A 
     JOIN t_stock AS B 
     ON A.product_code = B.product_code');
@@ -34,7 +34,7 @@ $sql1->execute();
 $row = $sql->fetch(PDO::FETCH_ASSOC);
 $row1 = $sql1->fetch(PDO::FETCH_ASSOC);
 
-$stock_price = $row['stock_price'];
+$stock_price_all = $row['stock_price_all'];
 $sell_price = $row1['sell_price'];
 
 // 受注一覧表示を以下に記載
@@ -51,14 +51,15 @@ $stmt->execute();
 $row2 = $stmt->fetch(PDO::FETCH_ASSOC);
 
 // 在庫一覧表示を以下に記載
-$stmt1 = $db->prepare('SELECT product_name, order_date, stock_qty, COUNT(B.order_id) AS trade_count
-FROM t_order AS B
-JOIN m_product AS C
-ON B.product_code = C.product_code
-JOIN t_stock AS D
-ON C.product_code = D.product_code
-ORDER BY B.order_date
-');
+$stmt1 = $db->prepare('SELECT product_name, order_date, stock_qty, 
+COUNT(B.order_id) AS trade_count
+ FROM t_order AS B 
+ JOIN m_product AS C 
+ ON B.product_code = C.product_code 
+ JOIN t_stock AS D 
+ ON C.product_code = D.product_code 
+ GROUP BY B.product_code, B.order_date 
+ ORDER BY B.order_date');
 $stmt1->execute();
 $row3 = $stmt1->fetch(PDO::FETCH_ASSOC);
 ?>
@@ -74,7 +75,7 @@ $row3 = $stmt1->fetch(PDO::FETCH_ASSOC);
         </div>
         
         <div>
-            【全体通貨在庫】<?php echo $row['stock_price'] . "円"; ?>【全体販売金額】<?php echo $row1['sell_price'] . "円"; ?>
+            【全体通貨在庫】<?php echo $row['stock_price_all'] . "円"; ?>【全体販売金額】<?php echo $row1['sell_price'] . "円"; ?>
         </div>
        
         <div>
